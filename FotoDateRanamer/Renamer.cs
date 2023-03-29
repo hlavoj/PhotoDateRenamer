@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using log4net;
 
 namespace FotoDateRanamer
@@ -117,11 +120,47 @@ namespace FotoDateRanamer
             List<string> files = Directory.GetFiles(s,"*.jpg").ToList();
             for (int i = 0; i < files.Count; i+=1)
             {
-                sum += File.GetLastWriteTime(files[i]).Ticks / files.Count;
+                sum += GetDateFromPhoto(files[i]).Ticks / files.Count;
             }
 
             return new DateTime((long)sum);
         }
+
+        private static DateTime GetDateFromPhoto(string path)
+        {
+            DateTime? dateTime = GetDateTakenFromPhoto(path);
+            if(dateTime== null)
+            {
+                dateTime = File.GetLastWriteTime(path);
+            }
+            return dateTime.Value;
+        }
+
+
+        private static DateTime? GetDateTakenFromPhoto(string path)
+        {
+            try
+            {
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+                using (Image myImage = Image.FromStream(fs, false, false))
+                {
+                    // Check if the photo has a property item with ID 36867, which stores the date taken
+                    if (myImage.PropertyIdList.Contains(36867))
+                    {
+                        PropertyItem propItem = myImage.GetPropertyItem(36867);
+                        string dateTaken = Encoding.UTF8.GetString(propItem.Value).Trim();
+                        return DateTime.ParseExact(dateTaken.Substring(0, 19), "yyyy:MM:dd HH:mm:ss", CultureInfo.InvariantCulture);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Handle exception
+            }
+
+            return null;
+        }
+
 
         private void RenameDir(string sourceDirName, string destDirName)
         {
